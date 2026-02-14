@@ -1,0 +1,44 @@
+name: Repo Sync
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync-code:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync and Clean
+        run: |
+          # 1. Setup identity
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 2. SAVE your sync file to the runner's home directory (outside the repo)
+          cp .github/workflows/sync.yml /home/runner/sync.yml_backup
+
+          # 3. Add source and fetch master
+          git remote add source https://github.com/nomi-sec/PoC-in-GitHub.git
+          git fetch source master --depth=1
+
+          # 4. Overwrite everything with their master
+          git reset --hard source/master
+
+          # 5. Clean their workflows so GitHub doesn't block the push
+          rm -rf .github/workflows
+          
+          # 6. Restore YOUR sync file from the backup location
+          mkdir -p .github/workflows
+          cp /home/runner/sync.yml_backup .github/workflows/sync.yml
+
+          # 7. Push to YOUR main branch
+          git add .
+          git commit -m "Sync: $(date)" || echo "No changes to sync"
+          git push origin main --force
