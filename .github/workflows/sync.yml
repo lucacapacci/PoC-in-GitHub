@@ -21,25 +21,28 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 2. SAVE your sync file to the runner's home directory (outside the repo)
+          # 2. SAVE your sync file to runner directory
           cp .github/workflows/sync.yml /home/runner/sync.yml_backup
 
-          # 3. Add source and fetch master
+          # 3. Add source and fetch master (shallow works fine)
           git remote add source https://github.com/nomi-sec/PoC-in-GitHub.git
           git fetch source master --depth=1
 
-          # 4. Overwrite everything with their master
+          # 4. Overwrite local tree with source/master
           git reset --hard source/master
 
-          # 5. Clean their workflows so GitHub doesn't block the push
+          # 5. Clean workflows & README
           rm -rf .github/workflows
           rm -rf README.md
-          
-          # 6. Restore YOUR sync file from the backup location
+
+          # 6. Restore YOUR sync file
           mkdir -p .github/workflows
           cp /home/runner/sync.yml_backup .github/workflows/sync.yml
 
-          # 7. Push to YOUR main branch
+          # 7. CLEAR the stale authorization header inserted by actions/checkout
+          git config --local --unset-all "http.https://github.com/.extraheader" || true
+
+          # 8. Push back to main using the standard GITHUB_TOKEN environment variable
           git add .
           git commit -m "Sync: $(date)" || echo "No changes to sync"
-          git push origin main --force
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main --force
