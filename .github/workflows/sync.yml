@@ -21,28 +21,25 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 2. Clone source into a temporary directory (fast & shallow)
+          # 2. Clone source into temporary location
           git clone --depth 1 https://github.com/nomi-sec/PoC-in-GitHub.git /tmp/source_repo
 
-          # 3. Wipe current files in your repo (except .git and your workflow)
-          # Save your sync workflow
+          # 3. Backup your sync workflow
           cp .github/workflows/sync.yml /tmp/sync.yml_backup
-          
-          # Delete everything in working tree
+
+          # 4. Wipe working directory (leaves .git untouched)
           find . -maxdepth 1 ! -name '.' ! -name '..' ! -name '.git' -exec rm -rf {} +
 
-          # 4. Copy files from upstream repo into yours
-          cp -r /tmp/source_repo/* . 2>/dev/null || true
-          cp -r /tmp/source_repo/.* . 2>/dev/null || true
-          rm -rf .git  # ensure we didn't copy their .git folder
+          # 5. Copy upstream files while explicitly EXCLUDING their .git directory
+          rsync -av --exclude='.git' /tmp/source_repo/ .
 
-          # 5. Clean upstream workflows and README, then restore YOUR sync file
+          # 6. Clean upstream workflows/README & restore your sync workflow
           rm -rf .github/workflows
           rm -rf README.md
           mkdir -p .github/workflows
           cp /tmp/sync.yml_backup .github/workflows/sync.yml
 
-          # 6. Commit and push standard file updates
+          # 7. Commit and push standard file updates
           git add -A
           git commit -m "Sync: $(date)" || echo "No changes to sync"
           git push origin main
