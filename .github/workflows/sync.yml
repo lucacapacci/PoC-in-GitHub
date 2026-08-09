@@ -21,28 +21,28 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 2. SAVE your sync file to runner directory
-          cp .github/workflows/sync.yml /home/runner/sync.yml_backup
+          # 2. Clone source into a temporary directory (fast & shallow)
+          git clone --depth 1 https://github.com/nomi-sec/PoC-in-GitHub.git /tmp/source_repo
 
-          # 3. Add source and fetch master (shallow works fine)
-          git remote add source https://github.com/nomi-sec/PoC-in-GitHub.git
-          git fetch source master --depth=1
+          # 3. Wipe current files in your repo (except .git and your workflow)
+          # Save your sync workflow
+          cp .github/workflows/sync.yml /tmp/sync.yml_backup
+          
+          # Delete everything in working tree
+          find . -maxdepth 1 ! -name '.' ! -name '..' ! -name '.git' -exec rm -rf {} +
 
-          # 4. Overwrite local tree with source/master
-          git reset --hard source/master
+          # 4. Copy files from upstream repo into yours
+          cp -r /tmp/source_repo/* . 2>/dev/null || true
+          cp -r /tmp/source_repo/.* . 2>/dev/null || true
+          rm -rf .git  # ensure we didn't copy their .git folder
 
-          # 5. Clean workflows & README
+          # 5. Clean upstream workflows and README, then restore YOUR sync file
           rm -rf .github/workflows
           rm -rf README.md
-
-          # 6. Restore YOUR sync file
           mkdir -p .github/workflows
-          cp /home/runner/sync.yml_backup .github/workflows/sync.yml
+          cp /tmp/sync.yml_backup .github/workflows/sync.yml
 
-          # 7. CLEAR the stale authorization header inserted by actions/checkout
-          git config --local --unset-all "http.https://github.com/.extraheader" || true
-
-          # 8. Push back to main using the standard GITHUB_TOKEN environment variable
-          git add .
+          # 6. Commit and push standard file updates
+          git add -A
           git commit -m "Sync: $(date)" || echo "No changes to sync"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main --force
+          git push origin main
